@@ -1,0 +1,41 @@
+{
+  "clinic": "Maple Street Family Clinic (fictional)",
+  "facts": [
+    {
+      "id": "hours",
+      "intent": "hours",
+      "keywords": ["hours", "open", "close", "closed", "when", "time", "weekend", "saturday", "sunday", "holiday"],
+      "text": "We are open Monday to Friday 8:00 AM - 6:00 PM and Saturday 9:00 AM - 1:00 PM. We are closed on Sundays and public holidays."
+    },
+    {
+      "id": "location",
+      "intent": "location",
+      "keywords": ["where", "address", "location", "located", "directions", "find", "street"],
+      "text": "We are at 42 Maple Street, Suite 3, Springfield, next to the public library."
+    },
+    {
+      "id": "parking",
+      "intent": "location",
+      "keywords": ["parking", "park", "car", "bus", "transit"],
+      "text": "Free parking is available behind the building. Bus route 7 stops right outside."
+    },
+    {
+      "id": "booking",
+      "intent": "booking",
+      "keywords": ["book", "booking", "appointment", "schedule", "reserve", "online", "walk", "visit"],
+      "text": "Book an appointment online at maplestreetclinic.example/book or call (555) 010-2000. Walk-ins are accepted until 4:00 PM on weekdays."
+    },
+    {
+      "id": "cancellation",
+      "intent": "booking",
+      "keywords": ["cancel", "cancellation", "reschedule", "change", "late", "fee"],
+      "text": "Please cancel or reschedule at least 24 hours in advance. Late cancellations may incur a $25 fee."
+    },
+    {
+      "id": "contact",
+      "intent": "other",
+      "keywords": ["phone", "call", "email", "contact", "number", "reach"],
+      "text": "Call us at (555) 010-2000 or email hello@maplestreetclinic.example. For emergencies, call 911."
+    }
+  ]
+}
