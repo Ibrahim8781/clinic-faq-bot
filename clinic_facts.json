@@ -1,5 +1,6 @@
 {
   "clinic": "Maple Street Family Clinic (fictional)",
+  "emergency_number": "999",
   "facts": [
     {
       "id": "hours",
@@ -35,7 +36,7 @@
       "id": "contact",
       "intent": "other",
       "keywords": ["phone", "call", "email", "contact", "number", "reach"],
-      "text": "Call us at (555) 010-2000 or email hello@maplestreetclinic.example. For emergencies, call 911."
+      "text": "Call us at (555) 010-2000 or email hello@maplestreetclinic.example. For emergencies, call {emergency_number}."
     }
   ]
 }

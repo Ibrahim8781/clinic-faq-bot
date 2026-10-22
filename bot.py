@@ -10,10 +10,12 @@ import groq
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
-FACTS = json.loads((Path(__file__).parent / "clinic_facts.json").read_text())["facts"]
+CLINIC = json.loads((Path(__file__).parent / "clinic_facts.json").read_text())
+EMERGENCY_NUMBER = CLINIC["emergency_number"]  # per clinic: 999 in Bahrain, 911 in the US, 112 in the EU
+FACTS = [{**f, "text": f["text"].format(emergency_number=EMERGENCY_NUMBER)} for f in CLINIC["facts"]]
 STAFF_PHONE = "(555) 010-2000"
 
-Intent = Literal["hours", "location", "booking", "symptom", "other"]
+Intent = Literal["hours", "location", "booking", "symptom", "emergency", "other"]
 
 
 class LLMReply(BaseModel):
@@ -33,17 +35,44 @@ class BotAnswer(LLMReply):
     source: Literal["llm", "fallback", "guardrail"]
 
 
-# --- Guardrail: symptom / medical questions never reach the LLM ---
+# --- Guardrails: emergencies and symptom questions never reach the LLM ---
+
+# Checked first. Phrases, not single words, so "Do you do chest X-rays?" or
+# "Do you have a heart specialist?" aren't treated as emergencies.
+EMERGENCY_PATTERN = re.compile(
+    r"heart attack|cardiac arrest|chest pains?|pain in (my|the|his|her) chest|"
+    r"(can['’]?t|cannot|can not|unable to|struggling to) breathe|not breathing|"
+    r"unconscious|unresponsive|passed out|"
+    r"in labou?r|going into labou?r|contractions|waters? (has |have )?broke",
+    re.IGNORECASE,
+)
 
 SYMPTOM_PATTERN = re.compile(
     r"\b(pain|ache|hurt|fever|rash|cough|sick|dizz|nause|vomit|bleed|swell|infect|"
-    r"symptom|diagnos|headache|chest|breath|dose|dosage|medication|medicine|pill)",
+    r"symptom|diagnos|headache|breath|dose|dosage|medication|medicine|pill)",
     re.IGNORECASE,
 )
 
 
+def is_emergency(question: str) -> bool:
+    return bool(EMERGENCY_PATTERN.search(question))
+
+
 def is_symptom(question: str) -> bool:
     return bool(SYMPTOM_PATTERN.search(question))
+
+
+def emergency_answer() -> BotAnswer:
+    return BotAnswer(
+        intent="emergency",
+        answer=(
+            f"This sounds like an emergency. Call emergency services now on {EMERGENCY_NUMBER}. "
+            "Don't wait for a reply here."
+        ),
+        route_to_staff=True,
+        sources=[],
+        source="guardrail",
+    )
 
 
 def guardrail_answer() -> BotAnswer:
@@ -51,7 +80,7 @@ def guardrail_answer() -> BotAnswer:
         intent="symptom",
         answer=(
             "I can't give medical advice. I've routed your question to our staff - "
-            f"call {STAFF_PHONE}, or 911 for emergencies."
+            f"call {STAFF_PHONE}, or {EMERGENCY_NUMBER} for emergencies."
         ),
         route_to_staff=True,
         sources=[],
@@ -109,7 +138,9 @@ Restate the relevant facts; don't guess about details the user didn't give (like
 List the ids of the facts you used in `sources`.
 If the facts don't cover the question, say you don't know, use intent "other" and set route_to_staff to true.
 Never give medical advice. If the question is about symptoms, health, or treatment, use intent "symptom",
-set route_to_staff to true, and tell the user staff will help at {STAFF_PHONE}."""
+set route_to_staff to true, and tell the user staff will help at {STAFF_PHONE}.
+If it sounds like a medical emergency, use intent "emergency", set route_to_staff to true,
+and tell the user to call emergency services now on {EMERGENCY_NUMBER}."""
 
 
 def ask_llm(question: str, facts: list[dict], client: groq.Groq) -> BotAnswer:
@@ -135,12 +166,17 @@ def ask_llm(question: str, facts: list[dict], client: groq.Groq) -> BotAnswer:
     allowed_ids = {f["id"] for f in facts}
     if not set(reply.sources) <= allowed_ids:
         raise ValueError(f"LLM cited facts it wasn't given: {reply.sources}")
+    # Safety replies always use the fixed wording, so they always carry the emergency number.
+    if reply.intent == "emergency":
+        return emergency_answer().model_copy(update={"source": "llm"})
     if reply.intent == "symptom":
-        reply.route_to_staff = True
+        return guardrail_answer().model_copy(update={"source": "llm"})
     return BotAnswer(**reply.model_dump(), source="llm")
 
 
 def answer(question: str, client: groq.Groq | None = None) -> BotAnswer:
+    if is_emergency(question):
+        return emergency_answer()
     if is_symptom(question):
         return guardrail_answer()
 
